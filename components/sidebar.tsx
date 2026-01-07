@@ -6,7 +6,6 @@ import { Home, Compass, HeartIcon, MessageCircle, User, Zap } from "lucide-react
 import { cn } from "@/lib/utils"
 import { useEffect, useState } from "react"
 import { MenuDrawer } from "./menu-drawer"
-import { NotificationsDropdown } from "./notifications-dropdown"
 import { createClient } from "@/lib/supabase/client"
 
 export function Sidebar() {
@@ -39,12 +38,9 @@ export function Sidebar() {
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-400 to-fuchsia-500 flex items-center justify-center neon-cyan transition-all group-hover:scale-110">
             <Zap className="h-4 w-4 text-white" />
           </div>
-          <span className="text-lg font-bold gradient-text-cyan-magenta">Sparkd</span>
+          <span className="text-lg font-bold gradient-text-cyan-magenta">Sparkd!!!</span>
         </Link>
-        <div className="flex items-center gap-2">
-          {user && <NotificationsDropdown userId={user.id} />}
-          {user && <MenuDrawer user={user} />}
-        </div>
+        {user && <MenuDrawer user={user} />}
       </div>
       <nav className="flex-1 space-y-1 p-4">
         {links.map((link) => {
