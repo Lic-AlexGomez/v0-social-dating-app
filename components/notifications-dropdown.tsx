@@ -112,7 +112,7 @@ export function NotificationsDropdown({ userId }: { userId: string }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80">
         <div className="px-4 py-2 border-b">
-          <h3 className="font-semibold">Notifications</h3>
+          <h3 className="font-semibold">Notifications.</h3>
         </div>
         <div className="max-h-96 overflow-y-auto">
           {notifications.length > 0 ? (
