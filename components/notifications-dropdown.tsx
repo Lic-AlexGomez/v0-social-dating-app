@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -10,34 +10,58 @@ import { Badge } from "@/components/ui/badge"
 import { formatDistanceToNow } from "date-fns"
 import Link from "next/link"
 
+interface NotificationUser {
+  username: string
+  display_name: string
+  avatar_url?: string
+}
+
+interface Notification {
+  id: string
+  type: string
+  user_id: string
+  from_user_id: string
+  post_id?: string
+  match_id?: string
+  is_read: boolean
+  created_at: string
+  from_user: NotificationUser
+}
+
 export function NotificationsDropdown({ userId }: { userId: string }) {
-  const [notifications, setNotifications] = useState<any[]>([])
+  const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
+
+  const loadNotifications = useCallback(async () => {
+    const supabase = createClient()
+    try {
+      const { data, error } = await supabase
+        .from("notifications")
+        .select(
+          `
+          *,
+          from_user:profiles!notifications_from_user_id_fkey(username, display_name, avatar_url)
+        `,
+        )
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(10)
+
+      if (error) {
+        console.error("Error loading notifications:", error)
+        return
+      }
+
+      setNotifications(data || [])
+      setUnreadCount(data?.filter((n) => !n.is_read).length || 0)
+    } catch (error) {
+      console.error("Error loading notifications:", error)
+    }
+  }, [userId])
 
   useEffect(() => {
     loadNotifications()
-    subscribeToNotifications()
-  }, [])
-
-  const loadNotifications = async () => {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from("notifications")
-      .select(
-        `
-        *,
-        from_user:profiles!notifications_from_user_id_fkey(username, display_name, avatar_url)
-      `,
-      )
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(10)
-
-    setNotifications(data || [])
-    setUnreadCount(data?.filter((n) => !n.is_read).length || 0)
-  }
-
-  const subscribeToNotifications = () => {
+    
     const supabase = createClient()
     const channel = supabase
       .channel(`notifications:${userId}`)
@@ -58,15 +82,28 @@ export function NotificationsDropdown({ userId }: { userId: string }) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }
+  }, [loadNotifications, userId])
 
   const markAsRead = async (notificationId: string) => {
     const supabase = createClient()
-    await supabase.from("notifications").update({ is_read: true }).eq("id", notificationId)
-    loadNotifications()
+    try {
+      const { error } = await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("id", notificationId)
+      
+      if (error) {
+        console.error("Error marking notification as read:", error)
+        return
+      }
+      
+      loadNotifications()
+    } catch (error) {
+      console.error("Error marking notification as read:", error)
+    }
   }
 
-  const getNotificationText = (notification: any) => {
+  const getNotificationText = (notification: Notification): string => {
     switch (notification.type) {
       case "like":
         return "liked your post"
@@ -83,16 +120,16 @@ export function NotificationsDropdown({ userId }: { userId: string }) {
     }
   }
 
-  const getNotificationLink = (notification: any) => {
+  const getNotificationLink = (notification: Notification): string => {
     switch (notification.type) {
       case "like":
       case "comment":
-        return `/post/${notification.post_id}`
+        return notification.post_id ? `/post/${notification.post_id}` : "/feed"
       case "follow":
         return `/profile/${notification.from_user.username}`
       case "match":
       case "message":
-        return `/messages/${notification.match_id}`
+        return notification.match_id ? `/messages/${notification.match_id}` : "/messages"
       default:
         return "/feed"
     }
@@ -112,7 +149,7 @@ export function NotificationsDropdown({ userId }: { userId: string }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80">
         <div className="px-4 py-2 border-b">
-          <h3 className="font-semibold">Notifications.</h3>
+          <h3 className="font-semibold">Notifications</h3>
         </div>
         <div className="max-h-96 overflow-y-auto">
           {notifications.length > 0 ? (
@@ -125,7 +162,7 @@ export function NotificationsDropdown({ userId }: { userId: string }) {
                 >
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={notification.from_user?.avatar_url || undefined} />
-                    <AvatarFallback>{notification.from_user?.display_name?.[0]}</AvatarFallback>
+                    <AvatarFallback>{notification.from_user?.display_name?.[0] || "U"}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm">

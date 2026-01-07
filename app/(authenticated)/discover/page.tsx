@@ -2,17 +2,23 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { Sidebar } from "@/components/sidebar"
-import { Navigation } from "@/components/navigation"
 import { SwipeCard } from "@/components/swipe-card"
 import { SwipeActions } from "@/components/swipe-actions"
 import { useRouter } from "next/navigation"
-import { Sparkles } from "lucide-react"
-import { Heart } from "lucide-react" // Import Heart component
+import { Sparkles, Heart } from "lucide-react"
+
+interface Profile {
+  id: string
+  display_name: string
+  username: string
+  avatar_url?: string
+  bio?: string
+  age?: number
+}
 
 export default function DiscoverPage() {
   const [user, setUser] = useState<any>(null)
-  const [profiles, setProfiles] = useState<any[]>([])
+  const [profiles, setProfiles] = useState<Profile[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [matchNotification, setMatchNotification] = useState<string | null>(null)
@@ -38,21 +44,32 @@ export default function DiscoverPage() {
     const supabase = createClient()
     setIsLoading(true)
 
-    // Get profiles that the user hasn't swiped on yet
-    const { data: swipedIds } = await supabase.from("swipes").select("target_user_id").eq("user_id", userId)
+    try {
+      // Get profiles that the user hasn't swiped on yet
+      const { data: swipedIds } = await supabase.from("swipes").select("target_user_id").eq("user_id", userId)
 
-    const swipedUserIds = swipedIds?.map((s) => s.target_user_id) || []
+      const swipedUserIds = swipedIds?.map((s) => s.target_user_id) || []
 
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .neq("id", userId)
-      .not("id", "in", `(${swipedUserIds.join(",")})`)
-      .limit(20)
+      let query = supabase
+        .from("profiles")
+        .select("*")
+        .neq("id", userId)
+        .limit(20)
 
-    setProfiles(data || [])
-    setCurrentIndex(0)
-    setIsLoading(false)
+      if (swipedUserIds.length > 0) {
+        query = query.not("id", "in", `(${swipedUserIds.join(",")})`)
+      }
+
+      const { data } = await query
+
+      setProfiles(data || [])
+      setCurrentIndex(0)
+    } catch (error) {
+      console.error("Error loading profiles:", error)
+      setProfiles([])
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleSwipe = async (direction: "left" | "right" | "super") => {
@@ -69,8 +86,7 @@ export default function DiscoverPage() {
       })
 
       if (error) {
-        console.error("[v0] Swipe insert error:", error)
-        // Continue anyway to show next profile
+        console.error("Swipe insert error:", error)
       }
 
       // Check for mutual match if swiped right or super
@@ -89,7 +105,7 @@ export default function DiscoverPage() {
         }
       }
     } catch (error) {
-      console.error("[v0] Swipe error:", error)
+      console.error("Swipe error:", error)
     }
 
     // Move to next profile
@@ -105,7 +121,7 @@ export default function DiscoverPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center sparkd-bg">
+      <div className="flex min-h-screen items-center justify-center">
         <div className="text-center space-y-4">
           <div className="w-16 h-16 rounded-full border-4 border-cyan-400 border-t-transparent animate-spin mx-auto" />
           <p className="text-white/70">Finding connections...</p>
@@ -115,47 +131,39 @@ export default function DiscoverPage() {
   }
 
   return (
-    <div className="flex min-h-screen sparkd-bg">
-      <Sidebar />
-      <main className="flex-1 pb-20 md:pb-0">
-        <div className="mx-auto max-w-2xl h-screen flex flex-col">
-          <header className="flex h-16 items-center glass-strong border-b border-white/10 px-4">
-            <h1 className="text-xl font-bold gradient-text-cyan-magenta">Discover</h1>
-          </header>
+    <div className="mx-auto max-w-2xl h-screen flex flex-col">
+      <header className="flex h-16 items-center glass-strong border-b border-white/10 px-4">
+        <h1 className="text-xl font-bold gradient-text-cyan-magenta">Discover</h1>
+      </header>
 
-          <div className="flex-1 p-4 flex flex-col">
-            <div className="relative flex-1 max-w-md mx-auto w-full">
-              {currentProfile ? (
-                <>
-                  <SwipeCard key={currentProfile.id} profile={currentProfile} onSwipe={handleSwipe} />
-                </>
-              ) : (
-                <div className="flex h-full items-center justify-center">
-                  <div className="text-center space-y-4 animate-scale-in">
-                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-cyan-400 to-fuchsia-500 flex items-center justify-center mx-auto opacity-20">
-                      <Sparkles className="h-10 w-10" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-white">No more profiles</h3>
-                    <p className="text-white/60">Check back later for new people!</p>
-                  </div>
+      <div className="flex-1 p-4 flex flex-col">
+        <div className="relative flex-1 max-w-md mx-auto w-full">
+          {currentProfile ? (
+            <SwipeCard key={currentProfile.id} profile={currentProfile} onSwipe={handleSwipe} />
+          ) : (
+            <div className="flex h-full items-center justify-center">
+              <div className="text-center space-y-4 animate-scale-in">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-cyan-400 to-fuchsia-500 flex items-center justify-center mx-auto opacity-20">
+                  <Sparkles className="h-10 w-10" />
                 </div>
-              )}
-            </div>
-
-            {currentProfile && (
-              <div className="mt-6">
-                <SwipeActions
-                  onSwipeLeft={() => handleSwipe("left")}
-                  onSwipeRight={() => handleSwipe("right")}
-                  onSuperLike={() => handleSwipe("super")}
-                  disabled={!currentProfile}
-                />
+                <h3 className="text-xl font-semibold text-white">No more profiles</h3>
+                <p className="text-white/60">Check back later for new people!</p>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
-      </main>
-      <Navigation />
+
+        {currentProfile && (
+          <div className="mt-6">
+            <SwipeActions
+              onSwipeLeft={() => handleSwipe("left")}
+              onSwipeRight={() => handleSwipe("right")}
+              onSuperLike={() => handleSwipe("super")}
+              disabled={!currentProfile}
+            />
+          </div>
+        )}
+      </div>
 
       {matchNotification && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in">
