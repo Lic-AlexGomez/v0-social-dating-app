@@ -38,7 +38,7 @@ export function Sidebar() {
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-400 to-fuchsia-500 flex items-center justify-center neon-cyan transition-all group-hover:scale-110">
             <Zap className="h-4 w-4 text-white" />
           </div>
-          <span className="text-lg font-bold gradient-text-cyan-magenta">Sparkd</span>
+          <span className="text-lg font-bold gradient-text-cyan-magenta">Sparkd!!!</span>
         </Link>
         {user && <MenuDrawer user={user} />}
       </div>
